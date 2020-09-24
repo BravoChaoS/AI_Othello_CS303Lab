@@ -5,6 +5,7 @@ import time
 COLOR_BLACK = -1
 COLOR_WHITE = 1
 COLOR_NONE = 0
+SEARCH_DEPTH = 4
 random.seed(time.time())
 
 
@@ -13,11 +14,20 @@ def shift_i(x, y, drc):
     return x + drc[0], y + drc[1]
 
 
-def opp_color(color):
+def adv_color(color):
     return 0 - color
 
 
 class AI(object):
+    drc = [[0, 1], [1, 1], [1, 0], [1, -1], [0, -1], [-1, -1], [-1, 0], [-1, 1]]
+    pnt = [[10, -5, 4, 3, 3, 4, -5, 10],
+           [-5, -10, 0, 0, 0, 0, -10, -5],
+           [4, 0, 0, 0, 0, 0, 0, 4],
+           [3, 0, 0, 0, 0, 0, 0, 3],
+           [3, 0, 0, 0, 0, 0, 0, 3],
+           [4, 0, 0, 0, 0, 0, 0, 4],
+           [-5, -10, 0, 0, 0, 0, -10, -5],
+           [10, -5, 4, 3, 3, 4, -5, 10]]
 
     # chessboard_size, color, time_out passed from agent
     def __init__(self, chessboard_size, color, time_out):
@@ -30,7 +40,6 @@ class AI(object):
         # You need add your decision into your candidate_list. System will get the end of your candidate_list as your
         # decision .
         self.candidate_list = []
-        self.drc = [[0, 1], [1, 1], [1, 0], [1, -1], [0, -1], [-1, -1], [-1, 0], [-1, 1]]
 
     def rev_drc(self, i):
         return self.drc[(i + 4) % 8]
@@ -42,8 +51,8 @@ class AI(object):
         check = False
         for drc in self.drc:
             ix, iy = shift_i(x, y, drc)
-            if self.is_inboard(ix, iy) and chessboard[ix][iy] == opp_color(color):
-                while self.is_inboard(ix, iy) and chessboard[ix][iy] == opp_color(color):
+            if self.is_inboard(ix, iy) and chessboard[ix][iy] == adv_color(color):
+                while self.is_inboard(ix, iy) and chessboard[ix][iy] == adv_color(color):
                     ix, iy = shift_i(ix, iy, drc)
                 if self.is_inboard(ix, iy) and chessboard[ix][iy] == color:
                     check = True
@@ -65,8 +74,8 @@ class AI(object):
         chessboard[x][y] = color
         for i in range(0, len(self.drc)):
             ix, iy = shift_i(x, y, self.drc[i])
-            if self.is_inboard(ix, iy) and chessboard[ix][iy] == opp_color(color):
-                while self.is_inboard(ix, iy) and chessboard[ix][iy] == opp_color(color):
+            if self.is_inboard(ix, iy) and chessboard[ix][iy] == adv_color(color):
+                while self.is_inboard(ix, iy) and chessboard[ix][iy] == adv_color(color):
                     ix, iy = shift_i(ix, iy, self.drc[i])
                 if self.is_inboard(ix, iy) and chessboard[ix][iy] == color:
                     while self.is_inboard(ix, iy) and (ix, iy) != (x, y):
@@ -77,10 +86,43 @@ class AI(object):
 
     def h(self, chessboard, color):
         valid_list = self.analyse_chessboard(chessboard, color)
-        return len(valid_list)
+        value = len(valid_list)
+        if color == self.color:
+            value = -value
+        return value, valid_list
 
-    def minimax_search(self, state, color, depth):
-        pass
+    def minimax_search(self, chessboard, color, depth, beta, bv):
+        value, valid_list = self.h(chessboard, color)
+        if color == self.color:
+            value = value - bv
+        else:
+            value = value + bv
+
+        if len(valid_list) == 0 or depth == 0:
+            return value
+
+        best_move = None
+        alpha = float('-inf')
+        if color == self.color:
+            alpha = -alpha
+        for x, y in valid_list:
+            temp_chessboard = self.move(chessboard, color, x, y)
+            tv = self.minimax_search(temp_chessboard, adv_color(color), depth - 1, alpha, self.pnt[x][y])
+            if color == self.color:
+                alpha = min(alpha, tv)
+                best_move = (x, y)
+                if alpha <= beta:
+                    break
+            else:
+                alpha = max(alpha, tv)
+                best_move = (x, y)
+                if alpha >= beta:
+                    break
+
+        if depth == SEARCH_DEPTH and best_move:
+            self.candidate_list.append(best_move)
+
+        return alpha
 
     # The input is current chessboard.
     def go(self, chessboard):
@@ -90,9 +132,11 @@ class AI(object):
         # Write your algorithm here
         # Here is the simplest sample:Random decision
         self.candidate_list = self.analyse_chessboard(chessboard, self.color)
-        if len(self.candidate_list) > 0:
-            rd = random.choice(self.candidate_list)
-            self.candidate_list.append(rd)
+        # if len(self.candidate_list) > 0:
+        #     rd = random.choice(self.candidate_list)
+        #     self.candidate_list.append(rd)
+        self.minimax_search(chessboard, self.color, SEARCH_DEPTH, float('-inf'), 0)
+        print(self.candidate_list)
 
         # ==============Find new pos========================================
         # Make sure that the position of your decision in chess board is empty.
