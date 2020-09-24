@@ -22,9 +22,24 @@ class AI(object):
         # You need add your decision into your candidate_list. System will get the end of your candidate_list as your
         # decision .
         self.candidate_list = []
+        self.drc = [[0, 1], [1, 1], [1, 0], [1, -1], [0, -1], [-1, -1], [-1, 0], [-1, 1]]
 
-        # The input is current chessboard.
+    def is_inboard(self, x, y):
+        return 0 <= x < self.chessboard_size and 0 <= y < self.chessboard_size
 
+
+    def is_valid(self, chessboard, x, y):
+        for i in self.drc:
+            check = 0
+            ix, iy = x, y
+            ix = ix + i[0]
+            iy = iy + i[1]
+            if chessboard[ix][iy] == 0 - self.color:
+                while
+
+        return True
+
+    # The input is current chessboard.
     def go(self, chessboard):
         # Clear candidate_list, must do this step
         self.candidate_list.clear()
