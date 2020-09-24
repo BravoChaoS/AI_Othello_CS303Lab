@@ -34,8 +34,7 @@ class AI(object):
             ix, iy = x, y
             ix = ix + i[0]
             iy = iy + i[1]
-            if chessboard[ix][iy] == 0 - self.color:
-                while
+            # if chessboard[ix][iy] == 0 - self.color:
 
         return True
 
