@@ -32,6 +32,9 @@ class AI(object):
         self.candidate_list = []
         self.drc = [[0, 1], [1, 1], [1, 0], [1, -1], [0, -1], [-1, -1], [-1, 0], [-1, 1]]
 
+    def rev_drc(self, i):
+        return self.drc[(i + 4) % 8]
+
     def is_inboard(self, x, y):
         return 0 <= x < self.chessboard_size and 0 <= y < self.chessboard_size
 
@@ -56,7 +59,27 @@ class AI(object):
                 valid_list.append((x, y))
         return valid_list
 
+    def move(self, chessboard, color, x, y):
+
+        # cnt = 0
+        chessboard[x][y] = color
+        for i in range(0, len(self.drc)):
+            ix, iy = shift_i(x, y, self.drc[i])
+            if self.is_inboard(ix, iy) and chessboard[ix][iy] == opp_color(color):
+                while self.is_inboard(ix, iy) and chessboard[ix][iy] == opp_color(color):
+                    ix, iy = shift_i(ix, iy, self.drc[i])
+                if self.is_inboard(ix, iy) and chessboard[ix][iy] == color:
+                    while self.is_inboard(ix, iy) and (ix, iy) != (x, y):
+                        chessboard[ix][iy] = color
+                        # cnt = cnt + 1
+                        ix, iy = shift_i(ix, iy, self.rev_drc(i))
+        return chessboard
+
     def h(self, chessboard, color):
+        valid_list = self.analyse_chessboard(chessboard, color)
+        return len(valid_list)
+
+    def minimax_search(self, state, color, depth):
         pass
 
     # The input is current chessboard.
