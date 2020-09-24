@@ -9,6 +9,10 @@ random.seed(0)
 
 
 # don't change the class name
+def shift_i(x, y, drc):
+    return x + drc[0], y + drc[1]
+
+
 class AI(object):
 
     # chessboard_size, color, time_out passed from agent
@@ -27,16 +31,17 @@ class AI(object):
     def is_inboard(self, x, y):
         return 0 <= x < self.chessboard_size and 0 <= y < self.chessboard_size
 
-
     def is_valid(self, chessboard, x, y):
-        for i in self.drc:
-            check = 0
-            ix, iy = x, y
-            ix = ix + i[0]
-            iy = iy + i[1]
-            # if chessboard[ix][iy] == 0 - self.color:
-
-        return True
+        check = False
+        for drc in self.drc:
+            ix, iy = shift_i(x, y, drc)
+            if self.is_inboard(ix, iy) and chessboard[ix][iy] == 0 - self.color:
+                while self.is_inboard(ix, iy) and chessboard[ix][iy] == 0 - self.color:
+                    ix, iy = shift_i(ix, iy, drc)
+                if self.is_inboard(ix, iy) and chessboard[ix][iy] == self.color:
+                    check = True
+                    break
+        return check
 
     # The input is current chessboard.
     def go(self, chessboard):
@@ -47,6 +52,9 @@ class AI(object):
         # Here is the simplest sample:Random decision
         idx = np.where(chessboard == COLOR_NONE)
         idx = list(zip(idx[0], idx[1]))
+        for x, y in idx:
+            if self.is_valid(chessboard, x, y):
+                self.candidate_list.append((x, y))
         # ==============Find new pos========================================
         # Make sure that the position of your decision in chess board is empty.
         # If not, the system will return error.
