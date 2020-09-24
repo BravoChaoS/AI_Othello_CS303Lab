@@ -5,7 +5,7 @@ import time
 COLOR_BLACK = -1
 COLOR_WHITE = 1
 COLOR_NONE = 0
-SEARCH_DEPTH = 4
+SEARCH_DEPTH = 15
 random.seed(time.time())
 
 
@@ -93,10 +93,10 @@ class AI(object):
 
     def minimax_search(self, chessboard, color, depth, beta, bv):
         value, valid_list = self.h(chessboard, color)
-        if color == self.color:
-            value = value - bv
-        else:
-            value = value + bv
+        # if color == self.color:
+        #     value = value - bv
+        # else:
+        #     value = value + bv
 
         if len(valid_list) == 0 or depth == 0:
             return value
