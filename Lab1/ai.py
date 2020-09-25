@@ -20,17 +20,20 @@ def adv_color(color):
 
 class AI(object):
     drc = [(0, 1), (1, 1), (1, 0), (1, -1), (0, -1), (-1, -1), (-1, 0), (-1, 1)]
-    CORNER_WEIGHT = 10
-    STAR_WEIGHT = -10
-
-    # pnt = [[10, -5, 4, 3, 3, 4, -5, 10],
-    #        [-5, -10, 0, 0, 0, 0, -10, -5],
-    #        [4, 0, 0, 0, 0, 0, 0, 4],
-    #        [3, 0, 0, 0, 0, 0, 0, 3],
-    #        [3, 0, 0, 0, 0, 0, 0, 3],
-    #        [4, 0, 0, 0, 0, 0, 0, 4],
-    #        [-5, -10, 0, 0, 0, 0, -10, -5],
-    #        [10, -5, 4, 3, 3, 4, -5, 10]]
+    WEIGHT_CONOR = 10
+    WEIGHT_STAR = -10
+    WEIGHT_DIFFERENCE = 10
+    WEIGHT_STABILITY = 10
+    WEIGHT_MOBILITY = 10
+    WEIGHT_POSITION = 10
+    WEIGHTED_BOARD = [[100, -10, 8, 6, 6, 8, -10, 100],
+                      [-10, -25, -4, -4, -4, -4, -25, -10],
+                      [8, -4, 6, 4, 4, 6, -4, 8],
+                      [6, -4, 4, 0, 0, 4, -4, 6],
+                      [6, -4, 4, 0, 0, 4, -4, 6],
+                      [8, -4, 6, 4, 4, 6, -4, 8],
+                      [-10, -25, -4, -4, -4, -4, -25, -10],
+                      [100, -10, 8, 6, 6, 8, -10, 100]]
 
     # chessboard_size, color, time_out passed from agent
     def __init__(self, chessboard_size, color, time_out):
@@ -69,7 +72,8 @@ class AI(object):
         for x, y in idx:
             if self.is_valid(chessboard, color, x, y):
                 valid_moves.append((x, y))
-        return valid_moves
+        depth = self.chessboard_size * self.chessboard_size - len(idx)
+        return depth, valid_moves
 
     def move(self, chessboard, color, x, y):
         # cnt = 0
@@ -88,19 +92,20 @@ class AI(object):
 
     def position_value(self, chessboard, color):
         value = 0
-        lim = self.chessboard_size
-        value = value + \
-                self.CORNER_WEIGHT * color * chessboard[0][0] + \
-                self.CORNER_WEIGHT * color * chessboard[0][lim - 1] + \
-                self.CORNER_WEIGHT * color * chessboard[lim - 1][0] + \
-                self.CORNER_WEIGHT * color * chessboard[lim - 1][lim - 1] + \
-                self.STAR_WEIGHT * color * chessboard[1][1] + \
-                self.STAR_WEIGHT * color * chessboard[1][lim - 2] + \
-                self.STAR_WEIGHT * color * chessboard[lim - 2][1] + \
-                self.STAR_WEIGHT * color * chessboard[lim - 2][lim - 2]
+
+        for i in range(self.chessboard_size):
+            for j in range(self.chessboard_size):
+                value = value + self.WEIGHTED_BOARD[i][j] * chessboard[i][j] * color
+
         return value
 
-    def stablize_bin_board(self, chessboard, bin_board, color, sx, sy):
+    @staticmethod
+    def difference(chessboard, color):
+        ply_cnt = len(np.where(chessboard == color)[0])
+        adv_cnt = len(np.where(chessboard == adv_color(color))[0])
+        return 100 * (ply_cnt - adv_cnt) / (ply_cnt + adv_cnt + 1)
+
+    def stabilize_bin_board(self, chessboard, bin_board, color, sx, sy):
         if chessboard[sx][sy] == color:
             bin_board[sx][sy] = True
             for dx, dy in self.drc:
@@ -111,34 +116,58 @@ class AI(object):
                     y = y + dy
         return bin_board
 
-    def count_stable(self, chessboard, color):
+    def stability(self, chessboard, color):
         bin_board = np.zeros((self.chessboard_size, self.chessboard_size), dtype=bool)
         lim = self.chessboard_size
 
         sx, sy = 0, 0
-        self.stablize_bin_board(chessboard, bin_board, color, sx, sy)
+        self.stabilize_bin_board(chessboard, bin_board, color, sx, sy)
         sx, sy = 0, lim - 1
-        self.stablize_bin_board(chessboard, bin_board, color, sx, sy)
+        self.stabilize_bin_board(chessboard, bin_board, color, sx, sy)
         sx, sy = lim - 1, 0
-        self.stablize_bin_board(chessboard, bin_board, color, sx, sy)
+        self.stabilize_bin_board(chessboard, bin_board, color, sx, sy)
         sx, sy = lim - 1, lim - 1
-        self.stablize_bin_board(chessboard, bin_board, color, sx, sy)
+        self.stabilize_bin_board(chessboard, bin_board, color, sx, sy)
 
         # print(bin_board)
-        value = 0
+        ply_value = 0
         for i in bin_board:
             for j in i:
                 if j:
-                    value = value + 1
-        return value
+                    ply_value = ply_value + 1
+
+        bin_board = np.zeros((self.chessboard_size, self.chessboard_size), dtype=bool)
+        lim = self.chessboard_size
+
+        sx, sy = 0, 0
+        self.stabilize_bin_board(chessboard, bin_board, adv_color(color), sx, sy)
+        sx, sy = 0, lim - 1
+        self.stabilize_bin_board(chessboard, bin_board, adv_color(color), sx, sy)
+        sx, sy = lim - 1, 0
+        self.stabilize_bin_board(chessboard, bin_board, adv_color(color), sx, sy)
+        sx, sy = lim - 1, lim - 1
+        self.stabilize_bin_board(chessboard, bin_board, adv_color(color), sx, sy)
+
+        # print(bin_board)
+        adv_value = 0
+        for i in bin_board:
+            for j in i:
+                if j:
+                    adv_value = adv_value + 1
+        return 100 * (ply_value - adv_value) / (ply_value + adv_value + 1)
 
     def h(self, chessboard, color):
-        valid_moves = self.get_valid_moves(chessboard, color)
+        # todo: adjust the weight by depth
+        depth, valid_moves = self.get_valid_moves(chessboard, color)
         mobility_value = len(valid_moves)
-        stable_value = self.count_stable(chessboard, color)
+        difference_value = self.difference(chessboard, color)
+        stable_value = self.stability(chessboard, color)
         position_value = self.position_value(chessboard, color)
         # print(mobility_value, stable_value, position_value)
-        total_value = mobility_value + 0 * stable_value + 10 * position_value
+        total_value = self.WEIGHT_MOBILITY * mobility_value + \
+                      self.WEIGHT_STABILITY * stable_value + \
+                      self.WEIGHT_POSITION * position_value + \
+                      self.WEIGHT_DIFFERENCE * difference_value
         return total_value, valid_moves
 
     def minimax_search(self, chessboard, color, depth, beta):
@@ -173,7 +202,7 @@ class AI(object):
         # ==================================================================
         # Write your algorithm here
         # Here is the simplest sample:Random decision
-        self.candidate_list = self.get_valid_moves(chessboard, self.color)
+        depth, self.candidate_list = self.get_valid_moves(chessboard, self.color)
         # if len(self.candidate_list) > 0:
         #     rd = random.choice(self.candidate_list)
         #     self.candidate_list.append(rd)
