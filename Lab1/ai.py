@@ -19,15 +19,18 @@ def adv_color(color):
 
 
 class AI(object):
-    drc = [[0, 1], [1, 1], [1, 0], [1, -1], [0, -1], [-1, -1], [-1, 0], [-1, 1]]
-    pnt = [[10, -5, 4, 3, 3, 4, -5, 10],
-           [-5, -10, 0, 0, 0, 0, -10, -5],
-           [4, 0, 0, 0, 0, 0, 0, 4],
-           [3, 0, 0, 0, 0, 0, 0, 3],
-           [3, 0, 0, 0, 0, 0, 0, 3],
-           [4, 0, 0, 0, 0, 0, 0, 4],
-           [-5, -10, 0, 0, 0, 0, -10, -5],
-           [10, -5, 4, 3, 3, 4, -5, 10]]
+    drc = [(0, 1), (1, 1), (1, 0), (1, -1), (0, -1), (-1, -1), (-1, 0), (-1, 1)]
+    CORNER_WEIGHT = 10
+    STAR_WEIGHT = -10
+
+    # pnt = [[10, -5, 4, 3, 3, 4, -5, 10],
+    #        [-5, -10, 0, 0, 0, 0, -10, -5],
+    #        [4, 0, 0, 0, 0, 0, 0, 4],
+    #        [3, 0, 0, 0, 0, 0, 0, 3],
+    #        [3, 0, 0, 0, 0, 0, 0, 3],
+    #        [4, 0, 0, 0, 0, 0, 0, 4],
+    #        [-5, -10, 0, 0, 0, 0, -10, -5],
+    #        [10, -5, 4, 3, 3, 4, -5, 10]]
 
     # chessboard_size, color, time_out passed from agent
     def __init__(self, chessboard_size, color, time_out):
@@ -59,17 +62,16 @@ class AI(object):
                     break
         return check
 
-    def analyse_chessboard(self, chessboard, color):
-        valid_list = []
+    def get_valid_moves(self, chessboard, color):
+        valid_moves = []
         idx = np.where(chessboard == COLOR_NONE)
         idx = list(zip(idx[0], idx[1]))
         for x, y in idx:
             if self.is_valid(chessboard, color, x, y):
-                valid_list.append((x, y))
-        return valid_list
+                valid_moves.append((x, y))
+        return valid_moves
 
     def move(self, chessboard, color, x, y):
-
         # cnt = 0
         chessboard[x][y] = color
         for i in range(0, len(self.drc)):
@@ -84,43 +86,83 @@ class AI(object):
                         ix, iy = shift_i(ix, iy, self.rev_drc(i))
         return chessboard
 
+    def position_value(self, chessboard, color):
+        value = 0
+        lim = self.chessboard_size
+        value = value + \
+                self.CORNER_WEIGHT * color * chessboard[0][0] + \
+                self.CORNER_WEIGHT * color * chessboard[0][lim - 1] + \
+                self.CORNER_WEIGHT * color * chessboard[lim - 1][0] + \
+                self.CORNER_WEIGHT * color * chessboard[lim - 1][lim - 1] + \
+                self.STAR_WEIGHT * color * chessboard[1][1] + \
+                self.STAR_WEIGHT * color * chessboard[1][lim - 2] + \
+                self.STAR_WEIGHT * color * chessboard[lim - 2][1] + \
+                self.STAR_WEIGHT * color * chessboard[lim - 2][lim - 2]
+        return value
+
+    def stablize_bin_board(self, chessboard, bin_board, color, sx, sy):
+        if chessboard[sx][sy] == color:
+            bin_board[sx][sy] = True
+            for dx, dy in self.drc:
+                x, y = sx, sy
+                while self.is_inboard(x, y) and chessboard[x][y] == color:
+                    bin_board[x][y] = True
+                    x = x + dx
+                    y = y + dy
+        return bin_board
+
+    def count_stable(self, chessboard, color):
+        bin_board = np.zeros((self.chessboard_size, self.chessboard_size), dtype=bool)
+        lim = self.chessboard_size
+
+        sx, sy = 0, 0
+        self.stablize_bin_board(chessboard, bin_board, color, sx, sy)
+        sx, sy = 0, lim - 1
+        self.stablize_bin_board(chessboard, bin_board, color, sx, sy)
+        sx, sy = lim - 1, 0
+        self.stablize_bin_board(chessboard, bin_board, color, sx, sy)
+        sx, sy = lim - 1, lim - 1
+        self.stablize_bin_board(chessboard, bin_board, color, sx, sy)
+
+        # print(bin_board)
+        value = 0
+        for i in bin_board:
+            for j in i:
+                if j:
+                    value = value + 1
+        return value
+
     def h(self, chessboard, color):
-        valid_list = self.analyse_chessboard(chessboard, color)
-        value = len(valid_list)
-        if color == self.color:
-            value = -value
-        return value, valid_list
+        valid_moves = self.get_valid_moves(chessboard, color)
+        mobility_value = len(valid_moves)
+        stable_value = self.count_stable(chessboard, color)
+        position_value = self.position_value(chessboard, color)
+        # print(mobility_value, stable_value, position_value)
+        total_value = mobility_value + 0 * stable_value + 10 * position_value
+        return total_value, valid_moves
 
-    def minimax_search(self, chessboard, color, depth, beta, bv):
-        value, valid_list = self.h(chessboard, color)
-        # if color == self.color:
-        #     value = value - bv
-        # else:
-        #     value = value + bv
+    def minimax_search(self, chessboard, color, depth, beta):
+        value, valid_moves = self.h(chessboard, color)
 
-        if len(valid_list) == 0 or depth == 0:
+        if len(valid_moves) == 0 or depth == 0:
             return value
 
         best_move = None
         alpha = float('-inf')
-        if color == self.color:
-            alpha = -alpha
-        for x, y in valid_list:
+        for x, y in valid_moves:
             temp_chessboard = self.move(chessboard, color, x, y)
-            tv = self.minimax_search(temp_chessboard, adv_color(color), depth - 1, alpha, self.pnt[x][y])
-            if color == self.color:
-                alpha = min(alpha, tv)
-                best_move = (x, y)
-                if alpha <= beta:
-                    break
-            else:
-                alpha = max(alpha, tv)
+            tv = -self.minimax_search(temp_chessboard, adv_color(color), depth - 1, -alpha)
+            # if depth == SEARCH_DEPTH:
+            #     print(tv, (x, y))
+            if tv > alpha:
+                alpha = tv
                 best_move = (x, y)
                 if alpha >= beta:
                     break
 
         if depth == SEARCH_DEPTH and best_move:
             self.candidate_list.append(best_move)
+            # print(alpha, best_move)
 
         return alpha
 
@@ -131,11 +173,11 @@ class AI(object):
         # ==================================================================
         # Write your algorithm here
         # Here is the simplest sample:Random decision
-        self.candidate_list = self.analyse_chessboard(chessboard, self.color)
+        self.candidate_list = self.get_valid_moves(chessboard, self.color)
         # if len(self.candidate_list) > 0:
         #     rd = random.choice(self.candidate_list)
         #     self.candidate_list.append(rd)
-        self.minimax_search(chessboard, self.color, SEARCH_DEPTH, float('-inf'), 0)
+        self.minimax_search(chessboard, self.color, SEARCH_DEPTH, float('inf'))
         print(self.candidate_list)
 
         # ==============Find new pos========================================
