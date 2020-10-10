@@ -5,27 +5,27 @@ import time
 COLOR_BLACK = -1
 COLOR_WHITE = 1
 COLOR_NONE = 0
-SEARCH_DEPTH = 15
+SEARCH_DEPTH = 4
+BIGIN = 15
 random.seed(time.time())
 
 
 # don't change the class name
-def shift_i(x, y, drc):
+def shift_i(x, y, drc, step=1):
     return x + drc[0], y + drc[1]
 
 
 def adv_color(color):
-    return 0 - color
+    return -color
 
 
 class AI(object):
     drc = [(0, 1), (1, 1), (1, 0), (1, -1), (0, -1), (-1, -1), (-1, 0), (-1, 1)]
-    WEIGHT_CONOR = 10
-    WEIGHT_STAR = -10
-    WEIGHT_DIFFERENCE = 10
-    WEIGHT_STABILITY = 10
-    WEIGHT_MOBILITY = 10
-    WEIGHT_POSITION = 10
+    WEIGHT_CORNER = 0
+    WEIGHT_DIFFERENCE = 0
+    WEIGHT_STABILITY = 0
+    WEIGHT_MOBILITY = 0
+    WEIGHT_POSITION = 0
     WEIGHTED_BOARD = [[100, -10, 8, 6, 6, 8, -10, 100],
                       [-10, -25, -4, -4, -4, -4, -25, -10],
                       [8, -4, 6, 4, 4, 6, -4, 8],
@@ -92,10 +92,22 @@ class AI(object):
 
     def position_value(self, chessboard, color):
         value = 0
-
         for i in range(self.chessboard_size):
             for j in range(self.chessboard_size):
                 value = value + self.WEIGHTED_BOARD[i][j] * chessboard[i][j] * color
+
+        if chessboard[0][0] != COLOR_NONE:
+            value = value - 2 * self.WEIGHTED_BOARD[1][0] * chessboard[1][0] * color
+            value = value - 2 * self.WEIGHTED_BOARD[0][1] * chessboard[0][1] * color
+        if chessboard[0][7] != COLOR_NONE:
+            value = value - 2 * self.WEIGHTED_BOARD[1][7] * chessboard[1][7] * color
+            value = value - 2 * self.WEIGHTED_BOARD[0][6] * chessboard[0][6] * color
+        if chessboard[7][0] != COLOR_NONE:
+            value = value - 2 * self.WEIGHTED_BOARD[6][0] * chessboard[6][0] * color
+            value = value - 2 * self.WEIGHTED_BOARD[7][1] * chessboard[7][1] * color
+        if chessboard[7][7] != COLOR_NONE:
+            value = value - 2 * self.WEIGHTED_BOARD[7][6] * chessboard[7][6] * color
+            value = value - 2 * self.WEIGHTED_BOARD[6][7] * chessboard[6][7] * color
 
         return value
 
@@ -103,9 +115,15 @@ class AI(object):
     def difference(chessboard, color):
         ply_cnt = len(np.where(chessboard == color)[0])
         adv_cnt = len(np.where(chessboard == adv_color(color))[0])
+
+        if ply_cnt == 0:
+            return -10000
+        if adv_cnt == 0:
+            return 10000
         return 100 * (ply_cnt - adv_cnt) / (ply_cnt + adv_cnt + 1)
 
     def stabilize_bin_board(self, chessboard, bin_board, color, sx, sy):
+        # todo: bfs
         if chessboard[sx][sy] == color:
             bin_board[sx][sy] = True
             for dx, dy in self.drc:
@@ -156,12 +174,24 @@ class AI(object):
                     adv_value = adv_value + 1
         return 100 * (ply_value - adv_value) / (ply_value + adv_value + 1)
 
+    def update_weight(self, rnd):
+        # dynamic
+        self.WEIGHT_DIFFERENCE = max(rnd - 40, 1) * 30
+        self.WEIGHT_MOBILITY = min(61 - rnd, 25) * 30
+        # static
+        self.WEIGHT_CORNER = 0
+        self.WEIGHT_STABILITY = 10
+        self.WEIGHT_POSITION = 50
+
     def h(self, chessboard, color):
-        # todo: adjust the weight by depth
+        # get status information
         depth, valid_moves = self.get_valid_moves(chessboard, color)
+        self.update_weight(depth - 4)
+        # calculate value
         mobility_value = len(valid_moves)
         difference_value = self.difference(chessboard, color)
-        stable_value = self.stability(chessboard, color)
+        stable_value = 0
+        # stable_value = self.stability(chessboard, color)
         position_value = self.position_value(chessboard, color)
         # print(mobility_value, stable_value, position_value)
         total_value = self.WEIGHT_MOBILITY * mobility_value + \
@@ -179,10 +209,12 @@ class AI(object):
         best_move = None
         alpha = float('-inf')
         for x, y in valid_moves:
-            temp_chessboard = self.move(chessboard, color, x, y)
+            # print(len(valid_moves))
+            temp_chessboard = chessboard.copy()
+            temp_chessboard = self.move(temp_chessboard, color, x, y)
             tv = -self.minimax_search(temp_chessboard, adv_color(color), depth - 1, -alpha)
-            # if depth == SEARCH_DEPTH:
-            #     print(tv, (x, y))
+            if depth == SEARCH_DEPTH:
+                print(tv, (x, y))
             if tv > alpha:
                 alpha = tv
                 best_move = (x, y)
