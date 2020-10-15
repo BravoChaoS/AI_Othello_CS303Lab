@@ -6,7 +6,8 @@ COLOR_BLACK = -1
 COLOR_WHITE = 1
 COLOR_NONE = 0
 SEARCH_DEPTH = 4
-BIGIN = 15
+SEP1 = 15
+SEP2 = 40
 random.seed(time.time())
 
 
@@ -218,6 +219,8 @@ class AI(object):
             if tv > alpha:
                 alpha = tv
                 best_move = (x, y)
+                if depth == SEARCH_DEPTH:
+                    self.candidate_list.append(best_move)
                 if alpha >= beta:
                     break
 
